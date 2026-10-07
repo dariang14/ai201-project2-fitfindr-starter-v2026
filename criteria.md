@@ -25,9 +25,13 @@ Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+My search is a plain keyword-overlap match against title, description, and
+style_tags — there's no synonym handling and no fuzzy matching. A phrasing
+that uses a word the listing data doesn't ("jumper" instead of "sweatshirt")
+can legitimately score zero even though a human would call it a match. That's
+a property of the search, not a loop bug, so I don't want a criterion that
+punishes the loop for it. 4 of 5 leaves room for a genuinely hard phrasing
+without hiding a real regression.
 
 ---
 
@@ -37,64 +41,58 @@ Given a query that matches no listings, the agent stops before calling
 `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+This path never touches the model at all — `search_listings` is pure keyword
+matching against static JSON, so the same impossible query returns the same
+empty list every single time. There's no randomness anywhere in this branch
+for 1 of 5 tries to differ on, so anything less than 5 of 5 would mean the
+branch itself is broken, not that the test is strict.
 
 ---
 
 ## 3. Something about state
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
+`session["selected_item"]` is the exact listing dict passed into `suggest_outfit()` —
+same `id`, same `title`, same `price` — in 5 of 5 tries on a matching query.
 
 **Why this target:**
-
-
+`run_agent` assigns `session["selected_item"] = results[0]` and then passes
+that same session field straight into `suggest_outfit()` — there's no copy,
+no re-fetch, no second lookup in between. Nothing in that path depends on the
+model or on randomness, so if this ever drifted it would mean the loop
+itself is broken, not that an edge case slipped through. That's worth 5 of 5,
+not 4 of 5.
 
 ---
 
 ## 4. Something about the fit card
 
-<!-- YOU WRITE THIS ONE.
-
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
+At least 4 of 5 fit cards generated for the same item mention that item's
+exact price (e.g. `$18.00` or `$18`) somewhere in the text.
 
 **Why this target:**
-
-
+`create_fit_card`'s prompt explicitly instructs the model to mention the
+price once, but the model is still free to phrase it in words ("eighteen
+dollars") instead of digits on an off try, and temperature is 0.9 on purpose
+so the cards aren't identical. 4 of 5 catches a prompt that's actually broken
+(never mentioning price) without failing the criterion over one stylistic
+phrasing choice.
 
 ---
 
 ## 5. Your choice
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+With an empty wardrobe, `suggest_outfit` returns a non-empty string of
+general styling advice (never an empty string, `None`, or an exception) — in
+5 of 5 tries.
 
 **Why this target:**
+The empty-wardrobe branch in `suggest_outfit` is a plain `if not items:` check
+that picks a different prompt — it doesn't depend on what the model says back,
+only on whether `generate()` returns something. Since the branch itself is
+deterministic and doesn't touch model randomness for its *shape*, only its
+wording, there's no reason to accept failures here. A new user with nothing
+saved is the very first thing a real user of this tool would be, so this is
+also the path I'd be most embarrassed to see break.
 
 
 
