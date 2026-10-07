@@ -127,19 +127,24 @@ $ python app.py ask 'vintage graphic tee under $30'
 
   Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
 
-  Outfit:   <!-- PASTE HERE — needs a real GEMINI_API_KEY, see note below -->
+  Outfit:   **Outfit 1: Casual Y2K Streetwear**
+  *   **Top:** Y2K Butterfly Baby Tee
+  *   **Bottoms:** Baggy straight-leg jeans (dark wash)
+  *   **Outerwear:** Vintage black denim jacket
+  *   **Shoes:** Chunky white sneakers
+  *   **Accessory:** Black crossbody bag
 
-  Fit card: <!-- PASTE HERE — needs a real GEMINI_API_KEY, see note below -->
+  **Outfit 2: Contrast Neutral Mix**
+  *   **Top:** Y2K Butterfly Baby Tee
+  *   **Bottoms:** Wide-leg khaki trousers
+  *   **Accessory:** Brown leather belt
+  *   **Outerwear:** Black cropped zip hoodie (worn open or carried)
+  *   **Shoes:** Black combat boots
 
-2 model calls this session
+  Fit card: Found this butterly print baby tee on Depop for $18 and my inner 2000s pop star is screaming. Paired it with baggy denim and chunky sneakers for the ultimate Y2K street style moment. Who knew $18 could buy time travel?
+
+2 model calls this session, 506 prompt + 199 output tokens
 ```
-
-> **Note on this run:** this session (a cloud container) had no GEMINI_API_KEY
-> configured, so `suggest_outfit` and `create_fit_card` couldn't be exercised
-> here. Everything that doesn't touch the model — `search_listings`, the
-> query parser, and the empty-search branch below — was run and verified
-> directly. The command above was run locally with a real key and the output
-> pasted in.
 
 **The three tools, tested one at a time**
 
@@ -150,12 +155,21 @@ $ python -c "from tools import search_listings; print(search_listings('graphic t
 
 ```
 $ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
-<!-- PASTE HERE — needs a real GEMINI_API_KEY -->
+**Outfit 1: Casual Streetwear**
+*   **Top:** White ribbed tank top
+*   **Outerwear:** Oversized grey crewneck sweatshirt (worn draped over the shoulders or layered)
+*   **Shoes:** Chunky white sneakers
+*   **Accessory:** Black crossbody bag
+
+**Outfit 2: Edgy Contrast**
+*   **Top:** Black cropped zip hoodie
+*   **Shoes:** Black combat boots
+*   **Accessory:** Brown leather belt (to break up the waist and anchor the vintage blue wash)
 ```
 
 ```
 $ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
-<!-- PASTE HERE — needs a real GEMINI_API_KEY -->
+Found these vintage Levi's 501 jeans on Depop for $38 and my casual off-duty model era is officially unlocked. Paired them with crisp white sneakers for that effortlessly cool 90s running-errands aesthetic. Honestly, nothing beats broken-in denim that actually fits like a glove.
 ```
 
 ---
