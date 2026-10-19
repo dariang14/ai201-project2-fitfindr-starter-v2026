@@ -342,6 +342,34 @@ $ python app.py ask 'designer ballgown size XXS under $5' --trace
 0 model calls this session
 ```
 
+**Model unavailable** (the third failure mode, triggered on purpose with a
+deliberately invalid `GEMINI_API_KEY` in `.env`)
+
+```
+$ python app.py ask 'vintage graphic tee under $30' --trace
+
+[1] parse_query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] suggest_outfit
+      →    ModelUnavailable, stopping
+
+  The model couldn't be reached: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+
+1 model calls this session
+```
+
+This one reached the real Gemini API (not a mock) and got a real rejection —
+the search step still completes over MCP (no model needed), then
+`suggest_outfit` raises `ModelUnavailable`, which `run_agent` catches and
+turns into a readable `session["error"]` instead of a stack trace. Between
+this and the two traces above, all three of the agent's failure modes are
+demonstrated: an empty search result, an empty wardrobe (criterion 5's run
+log), and an unreachable model.
+
 The empty-search trace is 3 steps and makes 0 model calls; the happy path is
 4 steps and makes 2. That gap is the branch actually doing its job.
 
