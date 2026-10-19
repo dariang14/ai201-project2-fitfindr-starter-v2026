@@ -29,24 +29,33 @@ SCENARIOS = [
         "criterion": 2,
     },
     {
-        # A user with nothing saved. One of unit 4's three failure modes.
+        # Same matching query as criterion 1. Criterion 3 — state identity.
+        # What's checked here isn't what the user typed, it's whether
+        # session["selected_item"] is the exact dict that reached
+        # suggest_outfit — any matching query works for that.
+        "name": "state: selected_item identity",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Same query, run five separate times (run_eval.py's --tries does
+        # that for every scenario). Criterion 4 checks whether the fit card
+        # mentions the item's exact price across those five real, uncached
+        # model calls.
+        "name": "fit card mentions price",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # A user with nothing saved. Criterion 5 — the empty-wardrobe branch
+        # must still return non-empty styling advice.
         "name": "empty wardrobe",
         "query": "denim jacket under $50",
         "wardrobe": "empty",
-        "criterion": None,
+        "criterion": 5,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
 ]
 
 WARDROBES = ("example", "empty")
