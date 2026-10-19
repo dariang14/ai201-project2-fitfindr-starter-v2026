@@ -105,9 +105,19 @@ def search_listings(
     return [listing for _, listing in scored[: config.SEARCH_RESULT_LIMIT]]
 
 
+# Common filler words. Without filtering these out, a query like "sneakers
+# for running" scores a hit on "for" against ANY listing whose description
+# happens to contain that word (e.g. "great for layering") — which can
+# outrank the one listing that's actually a pair of sneakers.
+_STOPWORDS = {
+    "a", "an", "the", "for", "in", "on", "of", "with", "and", "or", "to",
+    "is", "it", "my", "me", "i", "under", "size",
+}
+
+
 def _keywords(text: str) -> set[str]:
     """Lowercase word tokens, for a simple keyword-overlap score."""
-    return set(re.findall(r"[a-z0-9]+", text.lower()))
+    return set(re.findall(r"[a-z0-9]+", text.lower())) - _STOPWORDS
 
 
 def _size_matches(query_size: str, listing_size: str) -> bool:
