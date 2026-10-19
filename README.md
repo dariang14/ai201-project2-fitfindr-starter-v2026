@@ -376,41 +376,88 @@ below.
 
 ## The Improvement
 
-<!-- What you changed, why your diagnosis pointed at it, and the after-run in
-     the same table format. One change, measured properly.
+**What I changed:** Added a `_STOPWORDS` set (`a`, `an`, `the`, `for`, `in`,
+`on`, `of`, `with`, `and`, `or`, `to`, `is`, `it`, `my`, `me`, `i`, `under`,
+`size` — about 18 common filler words) and filtered it out of
+`tools.py::_keywords()`, the function that tokenizes both the query and each
+listing's text before scoring keyword overlap.
 
-     `python run_eval.py --label after` -->
+**Which failure it was meant to fix:** Not one of the five formal criteria —
+all five were already MET on the before run. It fixes the search-quality bug
+found in the Diagnoses section above: a query like `"sneakers for running"`
+matched on the word `"for"` against any listing whose description happened
+to contain it (e.g. `"great for layering"`), which could push an irrelevant
+item above the one listing that actually matched. Before the fix, that exact
+query ranked a track jacket and a cardigan above both real sneaker listings;
+after, it returns exactly the two sneaker listings and nothing else:
 
-**What I changed:**
-
-**Which failure it was meant to fix:**
+```
+$ python -c "from tools import search_listings; r = search_listings('sneakers for running'); [print(x['title']) for x in r]"
+Platform Sneakers — White Chunky Sole
+Low-Top Canvas Sneakers — Off-White
+```
 
 ### Run Log — After
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. matching query completes all three tools | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. impossible query stops before second tool | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. selected_item identity into suggest_outfit | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. fit card mentions the item's exact price | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. empty wardrobe returns non-empty advice | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Did it help, and how do I know:**
+Full table and output: `results/run_2026-10-18_2123_after.md`.
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
-
-
+**Did it help, and how do I know:** Yes, but the formal run log alone
+doesn't show it — and I want to be upfront about that rather than imply it
+does. All five criteria read identically before and after (same
+`selected_item` for every scenario, same pass counts), because none of the
+five scenario queries contain a stopword that was actually causing trouble.
+That's expected, not a failed measurement: this fix targets a bug the
+official scenarios never exercised in the first place, which is the whole
+reason I had to go looking for it with a separate, targeted test rather than
+reading it off the table. The real evidence is the standalone before/after
+on `"sneakers for running"` above — 2 correct results out of what was 9
+noisy ones, with no change to any of the five tracked scenarios' top
+results. If I were to redo Milestone 3, I'd add a sixth scenario built
+specifically to query with natural, stopword-containing phrasing, so this
+class of regression would show up in the formal table instead of needing a
+side investigation to catch.
 
 ---
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+None of the five formal criteria are currently missed, so there's nothing in
+that category to diagnose further. But "nothing failed" isn't the same as
+"nothing left," and a few real gaps remain:
 
-
+- **Criterion 1's scenario still doesn't test what its own reasoning worries
+  about.** I fixed the stopword bug the current scenario couldn't catch, but
+  I didn't go back and add a scenario that actually varies phrasing the way
+  criterion 1's target was written to anticipate. If I had more time, I'd add
+  2-3 more scenario entries under criterion 1 with deliberately different
+  wording for the same intent (e.g. "comfy old band shirt" instead of
+  "vintage graphic tee") and see if the 4/5 target still holds — right now
+  it's an aspirational number, not a measured one.
+- **The stopword list is hand-picked and small (~18 words), not a real
+  stopword corpus.** It fixes the specific case I found, but a word like
+  "with" or "great" appearing in enough descriptions could cause the same
+  kind of noise and isn't necessarily covered. A proper fix would use a
+  standard stopword list (e.g. from `nltk` or `sklearn`) instead of one I
+  typed by hand while testing one query.
+- **Only `search_listings` is on MCP, by design** (the assignment's
+  Milestone 1 explicitly says move one tool, not three), but that means
+  `suggest_outfit` and `create_fit_card` still aren't reachable by any other
+  agent — they're the two tools that actually call the model, which is
+  arguably where a published, reusable tool contract would matter most.
+- **`ModelUnavailable` was only tested against one failure mode** — a
+  syntactically-present-but-rejected API key. I didn't test what happens
+  under a real network outage or a model name that stops resolving
+  mid-session; `generate.py`'s `_explain()` has branches for those cases, but
+  I only exercised the "bad key" branch, deliberately, since it's the one I
+  could trigger without needing a flaky network to fail on cue.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
