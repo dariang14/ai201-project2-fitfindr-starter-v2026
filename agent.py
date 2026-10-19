@@ -17,7 +17,7 @@ import re
 
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card
+from tools import suggest_outfit, create_fit_card
 from generate import ModelUnavailable
 
 
@@ -140,6 +140,8 @@ def run_agent(query: str, wardrobe: dict) -> dict:
       • A handler for ModelUnavailable, so a bad key produces a message rather
         than a stack trace. The import is already at the top of this file.
     """
+    from mcp_client import call_tool, MCPError
+
     session = new_session(query, wardrobe)
 
     count = 0
@@ -147,13 +149,21 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     trace.check_iterations(count)
 
     session["parsed"] = parse_query(query)
+    trace.step("parse_query", inputs=query, returned=session["parsed"])
 
-    results = search_listings(
-        session["parsed"]["description"],
-        size=session["parsed"]["size"],
-        max_price=session["parsed"]["max_price"],
-    )
+    try:
+        results = call_tool("search_listings", {
+            "description": session["parsed"]["description"],
+            "size": session["parsed"]["size"],
+            "max_price": session["parsed"]["max_price"],
+        })
+    except MCPError as exc:
+        session["error"] = f"Couldn't reach the search tool over MCP: {exc}"
+        trace.step("search_listings (via MCP)", note="MCP call failed, stopping")
+        return session
+
     session["search_results"] = results
+    trace.step("search_listings (via MCP)", inputs=session["parsed"], returned=results)
 
     # THE BRANCH: nothing matched, stop before suggest_outfit.
     if not results:
@@ -161,17 +171,34 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             "No listings matched that query. Try loosening the price ceiling, "
             "dropping the size filter, or using fewer/different keywords."
         )
+        trace.step("branch", note="no search results — stopping before suggest_outfit")
         return session
 
     session["selected_item"] = results[0]
 
     count += 1
     trace.check_iterations(count)
-    session["outfit_suggestion"] = suggest_outfit(session["selected_item"], wardrobe)
+    try:
+        session["outfit_suggestion"] = suggest_outfit(session["selected_item"], wardrobe)
+    except ModelUnavailable as exc:
+        session["error"] = f"The model couldn't be reached: {exc}"
+        trace.step("suggest_outfit", note="ModelUnavailable, stopping")
+        return session
+    trace.step(
+        "suggest_outfit",
+        inputs=session["selected_item"],
+        returned=session["outfit_suggestion"],
+    )
 
     count += 1
     trace.check_iterations(count)
-    session["fit_card"] = create_fit_card(session["outfit_suggestion"], session["selected_item"])
+    try:
+        session["fit_card"] = create_fit_card(session["outfit_suggestion"], session["selected_item"])
+    except ModelUnavailable as exc:
+        session["error"] = f"The model couldn't be reached: {exc}"
+        trace.step("create_fit_card", note="ModelUnavailable, stopping")
+        return session
+    trace.step("create_fit_card", inputs=session["outfit_suggestion"], returned=session["fit_card"])
 
     return session
 
