@@ -211,94 +211,166 @@ Found these vintage Levi's 501 jeans on Depop for $38 and my casual off-duty mod
 
 ## Run Log — Before
 
-<!-- Five criteria, five tries each, in this exact format.
-
-     Five, because your criteria are written out of five. Mark each try PASS
-     or FAIL, count the passes, and read that count against your target — a
-     row targeting 4 of 5 with three PASS cells is MISSED (3/5).
-
-     `python run_eval.py --label before` runs everything and writes the table
-     into results/. Paste it here and fill in the verdicts. -->
-
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. matching query completes all three tools | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. impossible query stops before second tool | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. selected_item identity into suggest_outfit | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. fit card mentions the item's exact price | 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. empty wardrobe returns non-empty advice | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+Full table and output: `results/run_2026-10-18_2110_before.md`.
+
+**Real output from one try**, from `run_eval.py::run_once` calling
+`agent.py::run_agent` (scenario "matching query completes", try 1):
 
 ```
+- stopped early: no
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+- search_results: 10
 
+Outfit suggestion:
+**Outfit 1: Y2K Streetwear**
+*   **Top:** Y2K Butterfly Baby Tee
+*   **Bottoms:** Baggy straight-leg jeans
+*   **Outerwear:** Vintage black denim jacket
+*   **Shoes:** Chunky white sneakers
+*   **Accessory:** Black crossbody bag
+
+**Outfit 2: Casual Contrast**
+*   **Top:** Y2K Butterfly Baby Tee
+*   **Bottoms:** Wide-leg khaki trousers
+*   **Outerwear:** Black cropped zip hoodie (worn open or tied around the waist)
+*   **Shoes:** Chunky white sneakers
+*   **Accessory:** Brown leather belt
+
+Fit card:
+Found the ultimate Y2K streetwear piece on Depop for just $18. Pair this butterfly baby tee with baggy denim and chunky sneakers to channel peak 2000s mall-goth energy. Nostalgia looks good on a budget.
 ```
 
 ---
 
 ## Verdicts and Diagnoses
 
-<!-- MET or MISSED per criterion against LAST UNIT's target, plus a sentence on
-     how you decided.
-
-     Then, for every miss: which of the four places it happened — a tool, the
-     loop's branch, the session, or the model's output — AND the mechanism.
-
-     Not a diagnosis:  "The fit card was bad."
-     A diagnosis:      "The fit card criterion missed on 2 of 5 items. Both had
-                        an empty brand field. My prompt puts the brand in the
-                        first sentence, so the card opened with a blank and read
-                        like a fragment. The tool worked; the prompt assumed a
-                        field that isn't always there."
-
-     Look for a pattern. Three misses on the same tool is one problem, not
-     three. -->
-
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | matching query completes all three tools | 4/5 | MET (5/5) | All 5 tries had `error: None`, a non-null `selected_item`, a non-empty `outfit_suggestion`, and a non-empty `fit_card` — read directly off `results/run_..._before.md`. |
+| 2 | impossible query stops before second tool | 5/5 | MET (5/5) | All 5 tries show `stopped early: yes`, `search_results: 0`, and the trace ends at step `[3] branch` — `suggest_outfit` never appears in the trace for any try. |
+| 3 | selected_item identity into suggest_outfit | 5/5 | MET (5/5) | For each try, the trace's `[3] suggest_outfit  in:` line (e.g. `Y2K Baby Tee — Butterfly Print ($18.0, depop)`) is character-for-character the same as that try's `selected_item` line. |
+| 4 | fit card mentions the item's exact price | 4/5 | MET (5/5) | The item's price is `$18.0`. All 5 fit cards contain the substring `$18` (e.g. "...Depop for $18 and my inner 2000s pop star..."). |
+| 5 | empty wardrobe returns non-empty advice | 5/5 | MET (5/5) | All 5 tries with the empty wardrobe produced a non-empty `outfit_suggestion` of general advice (no wardrobe piece named, since there were none to name) rather than an empty string or an error. |
 
 **Diagnoses**
 
+No misses on the five formal criteria this run — all five targets were met,
+several at a higher rate than the target called for (criteria 1 and 4 both
+hit 5/5 against a 4/5 target).
 
+That's worth being suspicious of rather than just taking a win, so I went
+looking for where a target might be too easy rather than assuming the build
+is flawless. **Criterion 1's target (4/5) was never actually tested, because
+the scenario reruns the identical query five times.** `search_listings` has
+no randomness in it — the same `description`/`size`/`max_price` always
+produces the same ranked list — so five tries of one query only ever measure
+whether it matches *once*, not whether the keyword search holds up across
+different phrasings, which is exactly the risk criterion 1's reasoning names.
+
+To actually probe that, I ran `search_listings` directly (no model needed)
+against phrasings further from the listing data's own wording:
+
+```
+$ python -c "from tools import search_listings; r = search_listings('sneakers for running'); [print(x['title']) for x in r[:5]]"
+90s Track Jacket — Navy/White Stripe
+Knit Cardigan — Chunky Brown
+Low-Rise Cargo Pants — Khaki
+Mesh Long-Sleeve Top — Black
+Platform Sneakers — White Chunky Sole
+```
+
+**The mechanism:** `_keywords()` tokenized the whole query, including filler
+words like "for". The word "for" appears inside many unrelated listings'
+descriptions ("great **for** layering," "**for** layering with a long tee"),
+so it counted as a real keyword match and inflated those listings' scores —
+enough to outrank the one listing that's actually a pair of sneakers
+(`Platform Sneakers — White Chunky Sole`, buried at position 5 instead of 1).
+This is a tool-level bug in `search_listings`'s scoring, not a loop or
+session problem — the loop and state handling around it are fine, as
+criterion 3 already confirms. It's outside all five formal criteria because
+none of their scenario queries happen to contain a common filler word, which
+is itself the finding: **the formal test suite under-tests criterion 1's own
+stated risk.**
 
 ---
 
 ## Loop Trace
 
-<!-- One full run, printed step by step, with the MCP call visible in it.
-
-     `python app.py ask '...' --trace` once you've added the trace.step()
-     calls in Milestone 2.
-
-     Worth pasting BOTH the happy path and the empty-search path. The empty
-     one should be visibly shorter, because it stops. If your two traces are
-     the same length, your branch isn't working — and this is the fastest way
-     anyone will ever find that out. -->
-
 **Happy path**
 
 ```
+$ python app.py ask 'vintage graphic tee under $30' --trace
 
+[1] parse_query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] suggest_outfit
+      in:  Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      out: **Outfit 1: Y2K Streetwear** *   **Top:** Y2K Butterfly Baby Tee *   **Bottoms:** Baggy straight-leg jeans *  …
+[4] create_fit_card
+      in:  **Outfit 1: Y2K Streetwear** *   **Top:** Y2K Butterfly Baby Tee *   **Bottoms:** Baggy straight-leg jeans *  …
+      out: Found the ultimate Y2K streetwear piece on Depop for just $18. Pair this butterfly baby tee with baggy denim a…
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'designer ballgown size XXS under $5' --trace
 
+[1] parse_query
+      in:  designer ballgown size XXS under $5
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] branch
+      →    no search results — stopping before suggest_outfit
+
+  No listings matched that query. Try loosening the price ceiling, dropping the size filter, or using fewer/different keywords.
+
+0 model calls this session
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+The empty-search trace is 3 steps and makes 0 model calls; the happy path is
+4 steps and makes 2. That gap is the branch actually doing its job.
 
+**On the MCP move:** `search_listings` moved from a direct function call to
+`mcp_client.call_tool("search_listings", {...})` in `agent.py::run_agent` —
+step `[2]` above is labeled `search_listings (via MCP)` for exactly that
+reason. The return shape didn't change at all: same list of listing dicts,
+same empty-list-on-no-match behavior. I verified the rewire two ways —
+`python mcp_client.py` lists the registered tool with its full schema
+(`description: string`, `size: string (optional)`, `max_price: number
+(optional)`), and both traces above show the MCP step returning normal data.
 
+I also deliberately called a tool name that isn't registered, to see the
+failure mode before trusting the happy path:
+
+```
+$ python -c "from mcp_client import call_tool, MCPError; call_tool('nonexistent_tool', {})"
+MCPError: Couldn't call 'nonexistent_tool' over MCP: unhandled errors in a TaskGroup (1 sub-exception)
+```
+
+Not the specific "the server doesn't offer a tool called..." message
+`mcp_client.py`'s own code tries to raise for this case — the error happens
+inside the `stdio_client`/`ClientSession` async context manager, and asyncio
+wraps whatever's raised there in a `TaskGroup` exception before it reaches my
+code. Either way, it surfaces as a catchable `MCPError`, which is what
+matters for `run_agent`: `call_tool` is already wrapped in a `try/except
+MCPError` there, so a broken MCP call becomes a `session["error"]` message
+instead of a stack trace — the same pattern used for `ModelUnavailable`
+below.
 
 ---
 
